@@ -1,0 +1,25 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
+{
+	"name": "Autoswitch Bot",
+	// The order of the files is important since later files override previous ones
+	"dockerComposeFile": [
+		"./docker-compose.yml"
+	],
+	"service": "switch_python_lib",
+	"workspaceFolder": "/workspace",
+	"shutdownAction": "stopCompose",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"GitHub.copilot",
+				"ms-azuretools.vscode-docker",
+				"rangav.vscode-thunder-client",
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-python.isort",
+				"donjayamanne.python-environment-manager"
+			]
+		}
+	}
+}
