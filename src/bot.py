@@ -1,10 +1,6 @@
 import sys
 import os
 
-
-sys.path.insert(0, os.path.join("swibots/src"))
-
-
 import swibots
 from swibots import BotApp, RegisterCommand
 import logging
