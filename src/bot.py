@@ -31,10 +31,15 @@ logging.config.dictConfig(config)
 log = logging.getLogger(__name__)
 
 
-TOKEN = os.getenv("TOKEN")
+token = os.getenv("TOKEN")
+username = os.getenv("USERNAME") or "test"
+password = os.getenv("PASSWORD") or "test"
 
 app = BotApp(
-    TOKEN, "A cool bot with annotations and everything you could possibly want :)"
+    username,
+    password,
+    token,
+    "A cool bot with annotations and everything you could possibly want :)"
 ).register_command(
     [
         RegisterCommand("json", "Prints the message json", True),
