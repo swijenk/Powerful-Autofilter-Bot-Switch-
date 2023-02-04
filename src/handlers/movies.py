@@ -13,3 +13,11 @@ def movies(app: BotApp):
         mymessage = await message.reply_text(f"Searching for {params}...")
         await asyncio.sleep(2)
         await mymessage.edit_text(f"I couldn't found any result for {params}!")
+
+    @app.on_command(["index"])
+    async def index_channel(ctx: BotContext[CommandEvent]):
+        message = ctx.event.message
+        mymessage = await message.reply_text("Indexing channel...")
+        total = 0
+        await asyncio.sleep(2)
+        await mymessage.edit_text(f"Done! I found {total} movies!")

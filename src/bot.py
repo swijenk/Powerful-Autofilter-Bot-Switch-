@@ -32,12 +32,8 @@ log = logging.getLogger(__name__)
 
 
 token = os.getenv("TOKEN")
-username = os.getenv("USERNAME") or "test"
-password = os.getenv("PASSWORD") or "test"
 
 app = BotApp(
-    username,
-    password,
     token,
     "A cool bot with annotations and everything you could possibly want :)"
 ).register_command(
@@ -47,6 +43,7 @@ app = BotApp(
         RegisterCommand("buttons", "Shows buttons", True),
         RegisterCommand(["movie", "movies", "film", "films", "search"],
                         "Show info about movies", True),
+        RegisterCommand("index", "Index channel", True),
     ]
 )
 init(app)
