@@ -7,4 +7,5 @@ venv
 **/*.log
 **/*.pycgit
 
-downloads
+downloads/
+tmp/

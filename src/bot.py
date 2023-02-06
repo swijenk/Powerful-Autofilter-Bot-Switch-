@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 
 token = os.getenv("TOKEN")
 
+
 app = BotApp(
     token,
     "A cool bot with annotations and everything you could possibly want :)"
@@ -47,4 +48,5 @@ app = BotApp(
     ]
 )
 init(app)
+
 app.run()

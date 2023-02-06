@@ -5,7 +5,8 @@ from typing import Tuple
 from swibots import BotApp, BotContext, MessageEvent, Message, InlineQuery, InlineQueryEvent, RestClient, RestResponse, JSONDict, NetworkError, InlineQueryResultArticle, InputMessageContent
 from .echo import echo
 from .json_dump import json_dump
-from .movies import movies
+from .media import media
+from .imdb import imdb
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +29,8 @@ def parse_response(response: Tuple[int, bytes]) -> RestResponse[JSONDict]:
 def init(app: BotApp):
     echo(app)
     json_dump(app)
-    movies(app)
+    media(app)
+    imdb(app)
 
     @app.on_message()
     async def on_message(ctx: BotContext[MessageEvent]):
