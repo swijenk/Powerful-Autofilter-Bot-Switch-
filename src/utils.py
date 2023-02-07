@@ -1,11 +1,32 @@
+import config
 from imdb import IMDb
 import re
+import os
+from config import AUTH_CHANNEL, LONG_IMDB_DESCRIPTION, MAX_LIST_ELM
+BTN_URL_REGEX = re.compile(
+    r"(\[([^\[]+?)\]\((buttonurl|buttonalert):(?:/{0,2})(.+?)(:same)?\))"
+)
 
 imdb = IMDb()
+
+# temp db for banned
+
+
+class temp(object):
+    BANNED_USERS = []
+    BANNED_CHATS = []
+    ME = None
+    CURRENT = int(os.environ.get("SKIP", 0))
+    CANCEL = False
+    MELCOW = {}
+    U_NAME = None
+    B_NAME = None
+    SETTINGS = {}
 
 
 async def get_poster(query, bulk=False, id=False, file=None):
     if not id:
+        # https://t.me/GetTGLink/4183
         query = (query.strip()).lower()
         title = query
         year = re.findall(r'[1-2]\d{3}$', query, re.IGNORECASE)
@@ -36,7 +57,7 @@ async def get_poster(query, bulk=False, id=False, file=None):
             return movieid
         movieid = movieid[0].movieID
     else:
-        movieid = int(query)
+        movieid = query
     movie = imdb.get_movie(movieid)
     if movie.get("original air date"):
         date = movie["original air date"]
@@ -90,8 +111,34 @@ def list_to_str(k):
         return "N/A"
     elif len(k) == 1:
         return str(k[0])
-    elif MAX_LIST_ELM:
-        k = k[:int(MAX_LIST_ELM)]
+    elif config.MAX_LIST_ELM:
+        k = k[:int(config.MAX_LIST_ELM)]
         return ' '.join(f'{elem}, ' for elem in k)
     else:
         return ' '.join(f'{elem}, ' for elem in k)
+
+
+def get_size(size):
+    """Get size in readable format"""
+
+    units = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB"]
+    size = float(size)
+    i = 0
+    while size >= 1024.0 and i < len(units):
+        i += 1
+        size /= 1024.0
+    return "%.2f %s" % (size, units[i])
+
+
+async def is_subscribed(bot, query):
+    try:
+        user = await bot.get_chat_member(AUTH_CHANNEL, query.from_user.id)
+    except UserNotParticipant:
+        pass
+    except Exception as e:
+        logger.exception(e)
+    else:
+        if user.status != 'kicked':
+            return True
+
+    return False
