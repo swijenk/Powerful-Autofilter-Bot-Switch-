@@ -1,7 +1,7 @@
 import logging
 from swibots import InlineKeyboardButton, InlineMarkup, InlineQueryResultDocument, InlineQuery, BotApp, BotContext, InlineQueryEvent, InlineQueryAnswer
 from database.ia_filterdb import get_search_results
-from utils import is_subscribed, get_size, temp
+from utils import is_subscribed, get_size, temp, file_int_from_name, file_str_from_int
 from config import CACHE_TIME, AUTH_USERS, AUTH_CHANNEL, CUSTOM_FILE_CAPTION
 
 logger = logging.getLogger(__name__)
@@ -43,8 +43,8 @@ def inline(app: BotApp):
         results = []
         if '|' in query.query:
             string, file_type = query.query.split('|', maxsplit=1)
+            file_type = file_int_from_name(file_type.lower().strip())
             string = string.strip()
-            file_type = file_type.strip().lower()
         else:
             string = query.query.strip()
             file_type = None
@@ -75,7 +75,7 @@ def inline(app: BotApp):
                     title=f_caption,
                     document_url=file.file_url,
                     mime_type=file.mime_type,
-                    description=f'Size: {get_size(file.file_size)}\nType: {file.file_type}',
+                    description=f'Size: {get_size(file.file_size)}\nType: {file_str_from_int(file.file_type)}',
                     reply_markup=reply_markup))
 
         if results:
@@ -110,8 +110,7 @@ def inline(app: BotApp):
     def get_reply_markup(query):
         buttons = [
             [
-                InlineKeyboardButton(
-                    app, 'Search again')
+                InlineKeyboardButton('Search again')
             ]
         ]
-        return InlineMarkup(app, buttons)
+        return InlineMarkup(buttons)

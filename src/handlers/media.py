@@ -1,9 +1,10 @@
 import asyncio
 import re
 from typing import List
-from swibots import BotApp, BotContext, CommandEvent, InlineMarkup, InlineKeyboardButton, filters, Message, Group, Channel
-from database.ia_filterdb import save_file
-from utils import temp
+from swibots import BotApp, BotContext, CommandEvent, InlineMarkup, InlineKeyboardButton, filters, Message, Group, Channel, CallbackQueryEvent
+from database.ia_filterdb import save_file, Media, get_search_results
+from utils import get_size, temp, file_int_from_name, file_str_from_int
+from config import ADMINS, CUSTOM_FILE_CAPTION
 import logging
 
 
@@ -14,7 +15,7 @@ logger.setLevel(logging.INFO)
 
 
 def media(app: BotApp):
-    @app.on_command(["movie", "movies", "film", "films"])
+    @app.on_command(["search", "file", "files"])
     async def show_movie_info(ctx: BotContext[CommandEvent]):
         message = ctx.event.message
         params = ctx.event.params
@@ -22,12 +23,29 @@ def media(app: BotApp):
             await message.reply_text(f"Please enter a movie name!\nType /{ctx.event.command} <movie name>")
             return
         mymessage = await message.reply_text(f"Searching for {params}...")
-        await asyncio.sleep(2)
-        await mymessage.edit_text(f"I couldn't found any result for {params}!")
+
+        await show_media_results(mymessage, params, "0", app)
+
+    @app.on_callback_query(filters.regexp('^search_prev'))
+    async def search_prev_callback(ctx: BotContext[CallbackQueryEvent]):
+        _, search_params, offset = ctx.event.callback_data.split('#')
+        mymessage = await ctx.event.message.edit_text(f"Searching for {search_params}...")
+        await show_media_results(mymessage, search_params, offset, app)
+
+    @app.on_callback_query(filters.regexp('^search_next'))
+    async def search_next_callback(ctx: BotContext[CallbackQueryEvent]):
+        _, search_params, offset = ctx.event.callback_data.split('#')
+        mymessage = await ctx.event.message.edit_text(f"Searching for {search_params}...")
+        await show_media_results(mymessage, search_params, offset, app)
 
     @app.on_command(["index"])
     async def index_channel(ctx: BotContext[CommandEvent]):
-        message = ctx.event.message
+        message: Message = ctx.event.message
+
+        if ADMINS is None or message.user_id not in ADMINS:
+            await message.reply_text("You are not allowed to use this command!")
+            return
+
         args = ctx.event.params
 
         params_regex = re.compile(r"^([a-zA-Z0-9\-]+) ?([0-9]+)? ?([0-9]+)?$")
@@ -38,7 +56,7 @@ def media(app: BotApp):
         if message.channel_id is not None:
             channel_or_group_id = message.channel_id
         elif message.group_id is not None:
-            channel_or_group_id = message.channel_id
+            channel_or_group_id = message.group_id
             is_group = True
         else:
             if not params_regex.match(args):
@@ -66,41 +84,121 @@ def media(app: BotApp):
         mymessage = await message.reply_text(f"Getting messages for {'Group' if is_group else 'Channel'} {channel_or_group_id}...")
         await index_files_to_db(channel_or_group=channel_or_group, is_group=is_group, msg=mymessage, app=app)
 
-        # get the messages
-        # messages = []
-        # has_more = True
-        # idx = 0
-        # page_size = 100
-        # while has_more:
-        #     if is_group:
-        #         history = await app.get_group_chat_history(channel_or_group_id, channel_or_group.community_id, message.user_id, page_size, idx*page_size)
-        #     else:
-        #         history = await app.get_channel_chat_history(channel_or_group_id, channel_or_group.community_id, message.user_id, page_size, idx*page_size)
+    @app.on_command(["deleteall"])
+    async def delete_all(ctx: BotContext[CommandEvent]):
+        message = ctx.event.message
 
-        #     has_more = history.messages is not None and len(
-        #         history.messages) > 0
+        if ADMINS is None or message.user_id not in ADMINS:
+            await message.reply_text("You are not allowed to use this command!")
+            return
 
-        #     if has_more:
-        #         messages.extend(history.messages)
+        await message.reply_text(
+            'This will delete all indexed files.\nDo you want to continue??',
+            inline_markup=InlineMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            text="YES", callback_data="delete_all_data"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="CANCEL", callback_data="close_data"
+                        )
+                    ],
+                ]
+            ),
+        )
 
-        #     idx += 1
+    @app.on_callback_query(filters.regexp(r'^delete_all_data'))
+    async def delete_all_index_confirm(ctx: BotContext[CallbackQueryEvent]):
+        message = ctx.event.message
+        await Media.collection.drop()
+        await message.edit_text('Succesfully Deleted All The Indexed Files.')
 
-        # await mymessage.edit_text(f"Found {len(messages)} messages...")
 
-        # media_messages = []
-        # for msg in messages:
-        #     if msg.media_id is not None and msg.media_id > 0:
-        #         media_messages.append(msg)
+async def show_media_results(msg: Message, search: str, offset: str, app: BotApp):
+    page_size = 10
+    results = []
+    if '|' in search:
+        string, file_type = search.split('|', maxsplit=1)
+        file_type = file_int_from_name(file_type.lower().strip())
+        string = string.strip()
+    else:
+        string = search.strip()
+        file_type = None
 
-        # await mymessage.edit_text(f"Found {len(media_messages)} messages with media...")
+    offset = int(offset or 0)
+    files, next_offset, total = await get_search_results(string,
+                                                         file_type=file_type,
+                                                         max_results=page_size,
+                                                         offset=offset)
 
-        # total = 0
+    for file in files:
+        title = file.file_name
+        size = get_size(file.file_size)
+        f_caption = file.caption
+        if CUSTOM_FILE_CAPTION:
+            try:
+                f_caption = CUSTOM_FILE_CAPTION.format(
+                    file_name='' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
+            except Exception as e:
+                logger.exception(e)
+                f_caption = f_caption
+        if f_caption is None:
+            f_caption = f"{file.file_name}"
 
-        # # index the messages
-        # for msg in media_messages:
-        #     total += 1
+        results.append([
+            InlineKeyboardButton(
+                text=f'📁 Name: {f_caption} Size: {get_size(file.file_size)}\nType: {file_str_from_int(file.file_type)}', url=file.file_url)
+        ])
 
-        # await mymessage.edit_text(f"Done! I saved {total} media messages!")
+    if results:
+        pm_text = f"📁 Results - {total}"
+        if string:
+            pm_text += f" for {string}"
+        try:
+            if int(offset) > 0 or (next_offset and int(next_offset) < int(total)):
+                pagination = []
+                if offset != 0:
+                    pagination.append(
+                        InlineKeyboardButton(
+                            text="Previous Page",
+                            callback_data=f"search_prev#{search}#{offset - page_size}"
+                        )
+                    )
+                else:
+                    pagination.append(
+                        InlineKeyboardButton(
+                            text="No previous data"
+                        )
+                    )
+
+                if int(next_offset) < int(total):
+                    pagination.append(
+                        InlineKeyboardButton(
+                            text="Next Page",
+                            callback_data=f"search_next#{search}#{next_offset}"
+                        )
+                    )
+                else:
+                    pagination.append(
+                        InlineKeyboardButton(
+                            text="No more data"
+                        )
+                    )
+
+                if len(pagination) > 0:
+                    results.append(pagination)
+
+            await msg.edit_text(pm_text, inline_markup=InlineMarkup(results))
+        except Exception as e:
+            logger.exception(str(e))
+    else:
+        if string:
+            await msg.edit_text(f"❌ No Results Found for {string}")
+        else:
+            await msg.edit_text(f"❌ No Results Found")
 
 
 async def index_files_to_db(channel_or_group: Group | Channel, is_group: bool, msg: Message, app: BotApp):
@@ -136,9 +234,8 @@ async def index_files_to_db(channel_or_group: Group | Channel, is_group: bool, m
                         current += 1
                         if current % 20 == 0:
                             can = [[InlineKeyboardButton(
-                                app,
                                 'Cancel', callback_data='index_cancel')]]
-                            reply = InlineMarkup(app, can)
+                            reply = InlineMarkup(can)
                             await msg.edit_text(
                                 text=f"Total messages fetched: <code>{current}</code>\nTotal messages saved: <code>{total_files}</code>\nDuplicate Files Skipped: <code>{duplicate}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon-Media messages skipped: <code>{no_media + unsupported}</code>(Unsupported Media - `{unsupported}` )\nErrors Occurred: <code>{errors}</code>",
                                 inline_markup=reply)

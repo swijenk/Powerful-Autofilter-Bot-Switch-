@@ -67,12 +67,10 @@ async def delete_filter(message, text, group_id):
     if query == 1:
         mycol.delete_one(myquery)
         await message.reply_text(
-            f"'`{text}`'  deleted. I'll not respond to that filter anymore.",
-            quote=True,
-            parse_mode="md"
+            f"'`{text}`'  deleted. I'll not respond to that filter anymore."
         )
     else:
-        await message.reply_text("Couldn't find that filter!", quote=True)
+        await message.reply_text("Couldn't find that filter!")
 
 
 async def del_all(message, group_id, title):
@@ -92,7 +90,7 @@ async def del_all(message, group_id, title):
 async def count_filters(group_id):
     mycol = mydb[str(group_id)]
 
-    count = mycol.count()
+    count = mycol.count_documents({})
     return False if count == 0 else count
 
 

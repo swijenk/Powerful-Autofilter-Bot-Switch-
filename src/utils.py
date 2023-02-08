@@ -1,11 +1,18 @@
+from typing import List
 import config
 from imdb import IMDb
 import re
 import os
+from swibots import InlineKeyboardButton, Message
 from config import AUTH_CHANNEL, LONG_IMDB_DESCRIPTION, MAX_LIST_ELM
 BTN_URL_REGEX = re.compile(
     r"(\[([^\[]+?)\]\((buttonurl|buttonalert):(?:/{0,2})(.+?)(:same)?\))"
 )
+
+BANNED = {}
+SMART_OPEN = '“'
+SMART_CLOSE = '”'
+START_CHAR = ('\'', '"', SMART_OPEN)
 
 imdb = IMDb()
 
@@ -142,3 +149,151 @@ async def is_subscribed(bot, query):
             return True
 
     return False
+
+
+def file_int_from_name(file_type):
+    if file_type == "image":
+        return 1
+    elif file_type == "video":
+        return 2
+    elif file_type == "audio":
+        return 3
+    elif file_type == "document":
+        return 7
+
+
+def file_str_from_int(file_type):
+    if file_type == 1:
+        return "image"
+    elif file_type == 2:
+        return "video"
+    elif file_type == 3:
+        return "audio"
+    elif file_type == 7:
+        return "document"
+
+
+def split_quotes(text: str) -> List:
+    if not any(text.startswith(char) for char in START_CHAR):
+        return text.split(None, 1)
+    counter = 1  # ignore first char -> is some kind of quote
+    while counter < len(text):
+        if text[counter] == "\\":
+            counter += 1
+        elif text[counter] == text[0] or (text[0] == SMART_OPEN and text[counter] == SMART_CLOSE):
+            break
+        counter += 1
+    else:
+        return text.split(None, 1)
+
+    # 1 to avoid starting quote, and counter is exclusive so avoids ending
+    key = remove_escapes(text[1:counter].strip())
+    # index will be in range, or `else` would have been executed and returned
+    rest = text[counter + 1:].strip()
+    if not key:
+        key = text[0] + text[0]
+    return list(filter(None, [key, rest]))
+
+
+def parser(text, keyword, app):
+    if "buttonalert" in text:
+        text = (text.replace("\n", "\\n").replace("\t", "\\t"))
+    buttons = []
+    note_data = ""
+    prev = 0
+    i = 0
+    alerts = []
+    for match in BTN_URL_REGEX.finditer(text):
+        # Check if btnurl is escaped
+        n_escapes = 0
+        to_check = match.start(1) - 1
+        while to_check > 0 and text[to_check] == "\\":
+            n_escapes += 1
+            to_check -= 1
+
+        # if even, not escaped -> create button
+        if n_escapes % 2 == 0:
+            note_data += text[prev:match.start(1)]
+            prev = match.end(1)
+            if match.group(3) == "buttonalert":
+                # create a thruple with button label, url, and newline status
+                if bool(match.group(5)) and buttons:
+                    buttons[-1].append(InlineKeyboardButton(
+                        app,
+                        text=match.group(2),
+                        callback_data=f"alertmessage:{i}:{keyword}"
+                    ))
+                else:
+                    buttons.append([InlineKeyboardButton(
+                        app,
+                        text=match.group(2),
+                        callback_data=f"alertmessage:{i}:{keyword}"
+                    )])
+                i += 1
+                alerts.append(match.group(4))
+            elif bool(match.group(5)) and buttons:
+                buttons[-1].append(InlineKeyboardButton(
+                    app,
+                    text=match.group(2),
+                    url=match.group(4).replace(" ", "")
+                ))
+            else:
+                buttons.append([InlineKeyboardButton(
+                    app,
+                    text=match.group(2),
+                    url=match.group(4).replace(" ", "")
+                )])
+
+        else:
+            note_data += text[prev:to_check]
+            prev = match.start(1) - 1
+    else:
+        note_data += text[prev:]
+
+    try:
+        return note_data, buttons, alerts
+    except:
+        return note_data, buttons, None
+
+
+def remove_escapes(text: str) -> str:
+    res = ""
+    is_escaped = False
+    for counter in range(len(text)):
+        if is_escaped:
+            res += text[counter]
+            is_escaped = False
+        elif text[counter] == "\\":
+            is_escaped = True
+        else:
+            res += text[counter]
+    return res
+
+
+async def get_channel_or_group(message: Message, app):
+    if message.channel_id is not None:
+        channel_or_group_id = message.channel_id
+    elif message.group_id is not None:
+        channel_or_group_id = message.group_id
+        is_group = True
+    else:
+        await message.reply_text("This command is only available for channels and groups!")
+        return
+
+    # get the channel
+    try:
+        channel_or_group = await app.get_channel(channel_or_group_id)
+        if channel_or_group is None:
+            await message.reply_text(f"Channel {channel_or_group_id} not found!")
+            return
+    except Exception as e:
+        try:
+            channel_or_group = await app.get_group(channel_or_group_id)
+            is_group = True
+            if channel_or_group is None:
+                await message.reply_text(f"Group {channel_or_group_id} not found!")
+                return
+        except Exception as e:
+            await message.reply_text(f"Channel or group {channel_or_group_id} not found!")
+            return
+    return channel_or_group, is_group

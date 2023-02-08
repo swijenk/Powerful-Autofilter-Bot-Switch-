@@ -21,9 +21,9 @@ def imdb(app: BotApp):
             ]
             for movie in movies
         ]
-        await message.edit_text(f"Here is what i found on IMDb", inline_markup=InlineMarkup(app, btn))
+        await message.edit_text(f"Here is what i found on IMDb", inline_markup=InlineMarkup(btn))
 
-    @app.on_command(["imdb", "search"])
+    @app.on_command(["imdb", "movie", "movies", "film", "films"])
     async def imdb_search(ctx: BotContext[CommandEvent]):
         message = ctx.event.message
         params = ctx.event.params
@@ -98,7 +98,7 @@ def imdb(app: BotApp):
             m.media_link = imdb['poster']
             m.status = 1  # 1 image, 2 video, 3 audio
             m.message = caption
-            m.inline_markup = InlineMarkup(app, btn)
+            m.inline_markup = InlineMarkup(btn)
             m.replied_to_id = message.replied_to_id  # reply to the original message
             # send the new message
             await m.send()
@@ -106,4 +106,4 @@ def imdb(app: BotApp):
             await message.delete()
 
         else:
-            await message.edit_text(caption, inline_markup=InlineMarkup(app, btn))
+            await message.edit_text(caption, inline_markup=InlineMarkup(btn))

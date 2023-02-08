@@ -39,11 +39,23 @@ app = BotApp(
         RegisterCommand("json", "Prints the message json", True),
         RegisterCommand("echo", "Echoes the message", True),
         RegisterCommand("buttons", "Shows buttons", True),
-        RegisterCommand(["movie", "movies", "film", "films", "imdb"],
-                        "Show info about movies", True),
-        RegisterCommand(["movie", "movies", "film", "films", "imdb"],
-                        "Show info about movies", True),
-        RegisterCommand("index", "Index channel", True),
+        # media
+        RegisterCommand(["search", "file", "files"],
+                        "Search for indexed media", True),
+        # help
+        RegisterCommand(["help", "start"],
+                        "Show help about commands", True),
+
+        # imdb
+        RegisterCommand(["movie", "movies", "film", "films"],
+                        "Search for a movie on IMDb", True),
+
+        # filters
+        RegisterCommand("addfilter", "Add a filter", True),
+        RegisterCommand("listfilters", "List all filters", True),
+        RegisterCommand("delfilter", "Delete a filter", True),
+        RegisterCommand("delallfilters", "Delete all filters", True),
+
     ]
 )
 
