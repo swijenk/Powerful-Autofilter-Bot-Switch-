@@ -1,4 +1,4 @@
 python-dotenv==0.21.0
 PyYAML==6.0
 IMDbPY==2022.7.9
-swibots==1.0.12
+swibots==1.1.3
